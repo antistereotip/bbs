@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>htop - System Monitor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #1a1a2e;
+    --bg2: #0d0d1a;
+    --header-bg: #00aa00;
+    --header-fg: #000000;
+    --bar-bg: #333355;
+    --bar-green: #00cc00;
+    --bar-blue: #4444ff;
+    --bar-red: #ff4444;
+    --bar-yellow: #ffaa00;
+    --text: #cccccc;
+    --text-bright: #ffffff;
+    --text-dim: #888888;
+    --cyan: #00cccc;
+    --green: #00cc00;
+    --yellow: #ffaa00;
+    --red: #ff4444;
+    --blue: #4488ff;
+    --magenta: #cc44cc;
+    --selected: #004488;
+    --border: #336633;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg2);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.4;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+  }
+
+  /* TOP HEADER SECTION */
+  #top-section {
+    display: flex;
+    gap: 0;
+    background: var(--bg2);
+    padding: 2px 0;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .cpu-meters {
+    flex: 1;
+    padding: 2px 8px;
+  }
+
+  .right-panel {
+    width: 280px;
+    padding: 2px 8px;
+    border-left: 1px solid var(--border);
+  }
+
+  .meter-row {
+    display: flex;
+    align-items: center;
+    height: 16px;
+    margin-bottom: 1px;
+  }
+
+  .meter-label {
+    width: 48px;
+    color: var(--green);
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .meter-bar-wrap {
+    flex: 1;
+    height: 12px;
+    background: var(--bar-bg);
+    position: relative;
+    border: 1px solid #444;
+  }
+
+  .meter-bar {
+    height: 100%;
+    transition: width 0.8s ease;
+    position: relative;
+  }
+
+  .meter-bar.cpu-bar {
+    background: linear-gradient(to right, var(--bar-green) 50%, var(--bar-blue) 50% 70%, var(--bar-red) 70%);
+    background-size: 200% 100%;
+  }
+
+  .meter-bar.mem-bar {
+    background: linear-gradient(to right, var(--bar-green) 60%, var(--bar-blue) 60% 80%, var(--bar-yellow) 80%);
+    background-size: 200% 100%;
+  }
+
+  .meter-bar.swap-bar {
+    background: var(--bar-red);
+  }
+
+  .meter-val {
+    width: 90px;
+    text-align: right;
+    color: var(--text);
+    font-size: 11px;
+    padding-left: 4px;
+    flex-shrink: 0;
+  }
+
+  /* right panel stats */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1px;
+    height: 16px;
+    align-items: center;
+  }
+  .stat-label { color: var(--cyan); }
+  .stat-val { color: var(--text-bright); }
+
+  /* TITLE BAR */
+  #title-bar {
+    background: var(--bg2);
+    text-align: center;
+    color: var(--green);
+    font-weight: 700;
+    font-size: 14px;
+    padding: 2px;
+    letter-spacing: 2px;
+    flex-shrink: 0;
+  }
+
+  /* COLUMN HEADERS */
+  #col-headers {
+    display: grid;
+    grid-template-columns: 50px 50px 60px 60px 70px 70px 60px 1fr 80px;
+    background: #004400;
+    color: var(--text-bright);
+    font-weight: 700;
+    padding: 1px 4px;
+    flex-shrink: 0;
+    font-size: 12px;
+  }
+
+  .col-hdr { padding: 0 2px; cursor: pointer; }
+  .col-hdr:hover { background: #006600; }
+  .col-hdr.sorted { color: var(--yellow); }
+
+  /* PROCESS LIST */
+  #process-list {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background: var(--bg);
+  }
+
+  .proc-row {
+    display: grid;
+    grid-template-columns: 50px 50px 60px 60px 70px 70px 60px 1fr 80px;
+    padding: 0 4px;
+    height: 18px;
+    align-items: center;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.1s;
+  }
+
+  .proc-row:hover { background: #223355; }
+  .proc-row.selected { background: var(--selected); }
+  .proc-row.kernel { color: var(--text-dim); }
+  .proc-row.high-cpu { color: var(--yellow); }
+  .proc-row.very-high-cpu { color: var(--red); font-weight: 700; }
+
+  .proc-cell { padding: 0 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proc-pid { color: var(--text-dim); }
+  .proc-user { color: var(--cyan); }
+  .proc-cpu { color: var(--green); }
+  .proc-mem { color: var(--blue); }
+  .proc-cmd { color: var(--text-bright); }
+  .proc-state-s { color: var(--green); }
+  .proc-state-r { color: var(--yellow); }
+  .proc-state-d { color: var(--red); }
+  .proc-state-z { color: var(--red); font-weight: 700; }
+
+  /* SCROLLBAR */
+  #process-list::-webkit-scrollbar { width: 8px; }
+  #process-list::-webkit-scrollbar-track { background: var(--bg2); }
+  #process-list::-webkit-scrollbar-thumb { background: #336633; }
+
+  /* BOTTOM BAR */
+  #bottom-bar {
+    display: flex;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    padding: 2px 0;
+  }
+
+  .fn-key {
+    display: flex;
+    align-items: center;
+    margin: 0 1px;
+  }
+
+  .fn-num {
+    background: var(--text);
+    color: var(--bg2);
+    padding: 1px 4px;
+    font-weight: 700;
+    font-size: 11px;
+  }
+
+  .fn-name {
+    background: #336633;
+    color: var(--text-bright);
+    padding: 1px 5px;
+    font-size: 11px;
+  }
+
+  /* SEARCH BAR */
+  #search-bar {
+    background: #003300;
+    color: var(--green);
+    padding: 2px 8px;
+    display: none;
+    flex-shrink: 0;
+    border-top: 1px solid var(--green);
+  }
+
+  #search-bar.visible { display: block; }
+
+  #search-input {
+    background: transparent;
+    border: none;
+    color: var(--green);
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    width: 200px;
+  }
+
+  /* MODAL */
+  #modal {
+    display: none;
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #0d1a0d;
+    border: 2px solid var(--green);
+    padding: 16px 24px;
+    z-index: 100;
+    min-width: 300px;
+  }
+
+  #modal.visible { display: block; }
+  #modal h3 { color: var(--green); margin-bottom: 8px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  #modal p { margin: 4px 0; }
+  #modal .close-hint { color: var(--text-dim); margin-top: 12px; font-size: 11px; }
+
+  /* LOAD AVG SPARKLINE */
+  .sparkline {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 14px;
+    vertical-align: middle;
+  }
+
+  .spark-bar {
+    width: 4px;
+    background: var(--green);
+    transition: height 0.5s;
+  }
+
+  /* Blinking cursor */
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0; } }
+  .cursor { animation: blink 1s infinite; }
+
+  /* Uptime counter */
+  #uptime { color: var(--text-bright); }
+</style>
+</head>
+<body>
+
+<!-- TOP SECTION -->
+<div id="top-section">
+  <div class="cpu-meters" id="cpu-meters"></div>
+  <div class="right-panel" id="right-panel">
+    <div class="stat-row">
+      <span class="stat-label">Tasks:</span>
+      <span class="stat-val"><span id="task-count">0</span>, <span id="run-count" style="color:var(--green)">0</span> running</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Load avg:</span>
+      <span class="stat-val" id="load-avg">0.00 0.00 0.00</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Uptime:</span>
+      <span class="stat-val" id="uptime">0:00:00</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Kernel:</span>
+      <span class="stat-val" style="color:var(--text-dim)">6.8.0-htop</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Hostname:</span>
+      <span class="stat-val" style="color:var(--magenta)" id="hostname">localhost</span>
+    </div>
+  </div>
+</div>
+
+<!-- TITLE -->
+<div id="title-bar">htop 3.3.0 - System Monitor Simulator</div>
+
+<!-- COLUMN HEADERS -->
+<div id="col-headers">
+  <div class="col-hdr sorted" data-col="pid" onclick="sortBy('pid')">PID</div>
+  <div class="col-hdr" data-col="user" onclick="sortBy('user')">USER</div>
+  <div class="col-hdr" data-col="pri" onclick="sortBy('pri')">PRI</div>
+  <div class="col-hdr" data-col="ni" onclick="sortBy('ni')">NI</div>
+  <div class="col-hdr" data-col="virt" onclick="sortBy('virt')">VIRT</div>
+  <div class="col-hdr" data-col="res" onclick="sortBy('res')">RES</div>
+  <div class="col-hdr" data-col="state" onclick="sortBy('state')">S</div>
+  <div class="col-hdr" data-col="cmd" onclick="sortBy('cmd')">Command</div>
+  <div class="col-hdr" data-col="cpu" onclick="sortBy('cpu')">CPU%</div>
+</div>
+
+<!-- PROCESS LIST -->
+<div id="process-list"></div>
+
+<!-- SEARCH -->
+<div id="search-bar">
+  <span style="color:var(--green);font-weight:700;">Search: </span>
+  <input id="search-input" type="text" placeholder="process name..." oninput="filterProcs()">
+  <span class="cursor">█</span>
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottom-bar">
+  <div class="fn-key"><span class="fn-num">F1</span><span class="fn-name">Help</span></div>
+  <div class="fn-key"><span class="fn-num">F2</span><span class="fn-name">Setup</span></div>
+  <div class="fn-key"><span class="fn-num">F3</span><span class="fn-name">Search</span></div>
+  <div class="fn-key"><span class="fn-num">F4</span><span class="fn-name">Filter</span></div>
+  <div class="fn-key"><span class="fn-num">F5</span><span class="fn-name">Tree</span></div>
+  <div class="fn-key"><span class="fn-num">F6</span><span class="fn-name">SortBy</span></div>
+  <div class="fn-key"><span class="fn-num">F7</span><span class="fn-name">Nice -</span></div>
+  <div class="fn-key"><span class="fn-num">F8</span><span class="fn-name">Nice +</span></div>
+  <div class="fn-key"><span class="fn-num">F9</span><span class="fn-name">Kill</span></div>
+  <div class="fn-key"><span class="fn-num">F10</span><span class="fn-name">Quit</span></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal">
+  <h3 id="modal-title">Process Info</h3>
+  <div id="modal-body"></div>
+  <p class="close-hint">Press ESC or click anywhere to close</p>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────
+const NUM_CPUS = 8;
+const PROCESSES_COUNT = 40;
+
+// ── STATE ────────────────────────────────────────────────────────────────
+let cpuUsages = Array(NUM_CPUS).fill(0);
+let memUsed = 0, memTotal = 15872; // MB
+let swapUsed = 0, swapTotal = 8192;
+let processes = [];
+let selectedPid = null;
+let sortCol = 'cpu';
+let sortAsc = false;
+let searchQuery = '';
+let uptimeSeconds = 0;
+let tickCount = 0;
+
+// ── PROCESS TEMPLATES ────────────────────────────────────────────────────
+const procTemplates = [
+  { cmd: 'systemd', user: 'root', base: 0.1 },
+  { cmd: 'kthreadd', user: 'root', base: 0 },
+  { cmd: 'ksoftirqd/0', user: 'root', base: 0.1 },
+  { cmd: 'kworker/0:0H', user: 'root', base: 0 },
+  { cmd: 'rcu_sched', user: 'root', base: 0.2 },
+  { cmd: 'migration/0', user: 'root', base: 0 },
+  { cmd: 'sshd', user: 'root', base: 0.0 },
+  { cmd: 'bash', user: 'user', base: 0.1 },
+  { cmd: 'python3 server.py', user: 'user', base: 1.2 },
+  { cmd: 'node index.js', user: 'user', base: 2.4 },
+  { cmd: 'nginx: master', user: 'root', base: 0.1 },
+  { cmd: 'nginx: worker', user: 'www-data', base: 0.3 },
+  { cmd: 'postgres', user: 'postgres', base: 0.5 },
+  { cmd: 'redis-server', user: 'redis', base: 0.2 },
+  { cmd: 'dockerd', user: 'root', base: 0.4 },
+  { cmd: 'containerd', user: 'root', base: 0.1 },
+  { cmd: 'firefox', user: 'user', base: 3.1 },
+  { cmd: 'code --type=renderer', user: 'user', base: 4.2 },
+  { cmd: 'Xorg', user: 'root', base: 0.8 },
+  { cmd: 'pulseaudio', user: 'user', base: 0.2 },
+  { cmd: 'NetworkManager', user: 'root', base: 0.1 },
+  { cmd: 'dbus-daemon', user: 'messagebus', base: 0.0 },
+  { cmd: 'cron', user: 'root', base: 0.0 },
+  { cmd: 'rsyslogd', user: 'root', base: 0.0 },
+  { cmd: 'top', user: 'user', base: 0.5 },
+  { cmd: 'htop', user: 'user', base: 0.3 },
+  { cmd: 'vim /etc/nginx/nginx.conf', user: 'root', base: 0.0 },
+  { cmd: 'wget https://example.com/large.iso', user: 'user', base: 0.1 },
+  { cmd: 'ffmpeg -i input.mp4', user: 'user', base: 12.5 },
+  { cmd: 'gcc -O2 main.c', user: 'user', base: 8.1 },
+  { cmd: 'make -j8', user: 'user', base: 22.0 },
+  { cmd: 'java -jar app.jar', user: 'user', base: 5.2 },
+  { cmd: 'rsync -avz /data/', user: 'root', base: 1.1 },
+  { cmd: 'find / -name "*.log"', user: 'root', base: 1.5 },
+  { cmd: 'stress --cpu 4', user: 'user', base: 35.0 },
+  { cmd: 'gnome-shell', user: 'user', base: 1.8 },
+  { cmd: 'gnome-terminal', user: 'user', base: 0.2 },
+  { cmd: 'chrome --renderer', user: 'user', base: 6.0 },
+  { cmd: 'python3 ml_train.py', user: 'user', base: 18.0 },
+  { cmd: 'mysqld', user: 'mysql', base: 0.9 },
+];
+
+const states = ['S','S','S','S','R','D','Z'];
+const stateWeights = [40,30,10,5,10,3,2];
+
+function weightedState() {
+  const total = stateWeights.reduce((a,b)=>a+b,0);
+  let r = Math.random()*total;
+  for(let i=0;i<states.length;i++){
+    r -= stateWeights[i];
+    if(r<=0) return states[i];
+  }
+  return 'S';
+}
+
+function fmtMem(mb) {
+  if(mb >= 1024) return (mb/1024).toFixed(2)+'G';
+  return mb.toFixed(0)+'M';
+}
+
+function initProcesses() {
+  processes = procTemplates.map((t, i) => ({
+    pid: 1 + i*Math.floor(1+Math.random()*12),
+    user: t.user,
+    pri: Math.floor(15+Math.random()*5),
+    ni: 0,
+    virt: Math.floor(50+Math.random()*2000),
+    res: Math.floor(10+Math.random()*500),
+    state: weightedState(),
+    cmd: t.cmd,
+    cpu: t.base,
+    mem: 0,
+    baseLoad: t.base,
+  }));
+  processes.forEach(p => {
+    p.mem = +(p.res/memTotal*100).toFixed(1);
+  });
+}
+
+// ── CPU METERS ────────────────────────────────────────────────────────────
+function buildCpuMeters() {
+  const el = document.getElementById('cpu-meters');
+  let html = '';
+  for(let i=0;i<NUM_CPUS;i++){
+    html += `
+    <div class="meter-row">
+      <div class="meter-label">${i===0?'CPU':''} ${i+1}</div>
+      <div class="meter-bar-wrap">
+        <div class="meter-bar cpu-bar" id="cpu-bar-${i}" style="width:0%"></div>
+      </div>
+      <div class="meter-val" id="cpu-val-${i}">0.0%</div>
+    </div>`;
+  }
+  html += `
+  <div class="meter-row">
+    <div class="meter-label" style="color:var(--cyan)">Mem</div>
+    <div class="meter-bar-wrap">
+      <div class="meter-bar mem-bar" id="mem-bar" style="width:0%"></div>
+    </div>
+    <div class="meter-val" id="mem-val">0/0M</div>
+  </div>
+  <div class="meter-row">
+    <div class="meter-label" style="color:var(--yellow)">Swp</div>
+    <div class="meter-bar-wrap">
+      <div class="meter-bar swap-bar" id="swap-bar" style="width:0%"></div>
+    </div>
+    <div class="meter-val" id="swap-val">0/0M</div>
+  </div>`;
+  el.innerHTML = html;
+}
+
+function updateMeters() {
+  // Animate CPU
+  for(let i=0;i<NUM_CPUS;i++){
+    const target = 5+Math.random()*70 + (tickCount%20<5?20:0);
+    cpuUsages[i] = cpuUsages[i]*0.7 + target*0.3;
+    const v = cpuUsages[i];
+    document.getElementById(`cpu-bar-${i}`).style.width = v+'%';
+    document.getElementById(`cpu-val-${i}`).textContent = v.toFixed(1)+'%';
+  }
+  // Memory
+  memUsed = 4200 + Math.sin(tickCount/20)*800 + Math.random()*200;
+  swapUsed = 512 + Math.random()*50;
+  const mPct = memUsed/memTotal*100;
+  const sPct = swapUsed/swapTotal*100;
+  document.getElementById('mem-bar').style.width = mPct+'%';
+  document.getElementById('mem-val').textContent = fmtMem(memUsed)+'/'+fmtMem(memTotal);
+  document.getElementById('swap-bar').style.width = sPct+'%';
+  document.getElementById('swap-val').textContent = fmtMem(swapUsed)+'/'+fmtMem(swapTotal);
+}
+
+// ── RIGHT PANEL ──────────────────────────────────────────────────────────
+function updateRightPanel() {
+  const running = processes.filter(p=>p.state==='R').length;
+  document.getElementById('task-count').textContent = processes.length;
+  document.getElementById('run-count').textContent = running;
+
+  const l1 = (cpuUsages.reduce((a,b)=>a+b,0)/NUM_CPUS/100*2).toFixed(2);
+  const l5 = (+l1+Math.random()*0.3-0.1).toFixed(2);
+  const l15 = (+l5+Math.random()*0.2-0.1).toFixed(2);
+  document.getElementById('load-avg').textContent = `${l1} ${l5} ${l15}`;
+
+  uptimeSeconds++;
+  const h = Math.floor(uptimeSeconds/3600);
+  const m = Math.floor((uptimeSeconds%3600)/60);
+  const s = uptimeSeconds%60;
+  document.getElementById('uptime').textContent =
+    (h?h+':':'') + String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+// ── PROCESS LIST ─────────────────────────────────────────────────────────
+function updateProcesses() {
+  processes.forEach(p => {
+    // Fluctuate CPU
+    const noise = (Math.random()-0.5)*3;
+    p.cpu = Math.max(0, p.baseLoad + noise + Math.sin(tickCount/15+p.pid)*p.baseLoad*0.3);
+    p.cpu = Math.min(99.9, p.cpu);
+    p.mem = +(p.res/memTotal*100).toFixed(1);
+    // Random state change
+    if(Math.random()<0.02) p.state = weightedState();
+  });
+}
+
+let sortCol2 = 'cpu';
+function sortBy(col) {
+  if(sortCol2===col) sortAsc=!sortAsc;
+  else { sortCol2=col; sortAsc=false; }
+  sortCol=col;
+  document.querySelectorAll('.col-hdr').forEach(el=>{
+    el.classList.toggle('sorted', el.dataset.col===col);
+  });
+  renderProcessList();
+}
+
+function filterProcs() {
+  searchQuery = document.getElementById('search-input').value.toLowerCase();
+  renderProcessList();
+}
+
+function getSorted() {
+  let list = [...processes];
+  if(searchQuery) list = list.filter(p=>p.cmd.toLowerCase().includes(searchQuery)||p.user.toLowerCase().includes(searchQuery));
+  list.sort((a,b)=>{
+    let va=a[sortCol2], vb=b[sortCol2];
+    if(typeof va==='string') return sortAsc?va.localeCompare(vb):vb.localeCompare(va);
+    return sortAsc?va-vb:vb-va;
+  });
+  return list;
+}
+
+function stateClass(s) {
+  if(s==='R') return 'proc-state-r';
+  if(s==='D') return 'proc-state-d';
+  if(s==='Z') return 'proc-state-z';
+  return 'proc-state-s';
+}
+
+function rowClass(p) {
+  let cls = 'proc-row';
+  if(p.cpu>30) cls+=' very-high-cpu';
+  else if(p.cpu>10) cls+=' high-cpu';
+  else if(p.user==='root'&&p.baseLoad===0) cls+=' kernel';
+  if(p.pid===selectedPid) cls+=' selected';
+  return cls;
+}
+
+function renderProcessList() {
+  const list = getSorted();
+  const container = document.getElementById('process-list');
+  const frag = document.createDocumentFragment();
+
+  list.forEach(p => {
+    const row = document.createElement('div');
+    row.className = rowClass(p);
+    row.dataset.pid = p.pid;
+    row.innerHTML =
+      `<div class="proc-cell proc-pid">${p.pid}</div>` +
+      `<div class="proc-cell proc-user">${p.user}</div>` +
+      `<div class="proc-cell">${p.pri}</div>` +
+      `<div class="proc-cell" style="color:var(--text-dim)">${p.ni}</div>` +
+      `<div class="proc-cell">${fmtMem(p.virt)}</div>` +
+      `<div class="proc-cell">${fmtMem(p.res)}</div>` +
+      `<div class="proc-cell ${stateClass(p.state)}">${p.state}</div>` +
+      `<div class="proc-cell proc-cmd">${p.cmd}</div>` +
+      `<div class="proc-cell proc-cpu">${p.cpu.toFixed(1)}</div>`;
+    row.onclick = () => selectRow(p.pid, p);
+    frag.appendChild(row);
+  });
+
+  container.innerHTML = '';
+  container.appendChild(frag);
+}
+
+function selectRow(pid, p) {
+  selectedPid = pid;
+  showModal(p);
+  renderProcessList();
+}
+
+// ── MODAL ────────────────────────────────────────────────────────────────
+function showModal(p) {
+  document.getElementById('modal-title').textContent = `PID ${p.pid} — ${p.cmd.split(' ')[0]}`;
+  document.getElementById('modal-body').innerHTML =
+    `<p><span style="color:var(--cyan)">PID:</span> ${p.pid}</p>` +
+    `<p><span style="color:var(--cyan)">User:</span> ${p.user}</p>` +
+    `<p><span style="color:var(--cyan)">Command:</span> ${p.cmd}</p>` +
+    `<p><span style="color:var(--cyan)">State:</span> <span class="${stateClass(p.state)}">${p.state} (${stateDesc(p.state)})</span></p>` +
+    `<p><span style="color:var(--cyan)">CPU%:</span> <span style="color:var(--green)">${p.cpu.toFixed(2)}%</span></p>` +
+    `<p><span style="color:var(--cyan)">MEM%:</span> <span style="color:var(--blue)">${p.mem}%</span></p>` +
+    `<p><span style="color:var(--cyan)">VIRT:</span> ${fmtMem(p.virt)}</p>` +
+    `<p><span style="color:var(--cyan)">RES:</span> ${fmtMem(p.res)}</p>` +
+    `<p><span style="color:var(--cyan)">Priority:</span> ${p.pri} (NI: ${p.ni})</p>`;
+  document.getElementById('modal').classList.add('visible');
+}
+
+function stateDesc(s) {
+  return {S:'Sleeping',R:'Running',D:'Uninterruptible',Z:'Zombie',T:'Traced',I:'Idle'}[s]||s;
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('visible');
+  selectedPid = null;
+  renderProcessList();
+}
+
+// ── KEYBOARD ─────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const search = document.getElementById('search-bar');
+  if(e.key==='F3'||e.key==='/'){ e.preventDefault(); search.classList.add('visible'); document.getElementById('search-input').focus(); return; }
+  if(e.key==='Escape'){
+    search.classList.remove('visible');
+    document.getElementById('search-input').value='';
+    searchQuery='';
+    closeModal();
+    renderProcessList();
+    return;
+  }
+  if(e.key==='F6'){ sortBy('cpu'); return; }
+  if(e.key==='F10'){ /* ignore */ return; }
+});
+
+document.getElementById('modal').addEventListener('click', closeModal);
+
+// ── HOSTNAME ──────────────────────────────────────────────────────────────
+try { document.getElementById('hostname').textContent = location.hostname||'localhost'; } catch(e){}
+
+// ── TICK ─────────────────────────────────────────────────────────────────
+function tick() {
+  tickCount++;
+  updateMeters();
+  updateProcesses();
+  updateRightPanel();
+  renderProcessList();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+buildCpuMeters();
+initProcesses();
+uptimeSeconds = Math.floor(Math.random()*86400);
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
