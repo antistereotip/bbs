@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DARKNET BBS v2.3 — Dobrodošli!</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;700&family=Courier+Prime:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --bg2: #0f0f0f;
+    --green: #00ff41;
+    --green-dim: #00cc33;
+    --green-dark: #003300;
+    --amber: #ffb000;
+    --cyan: #00ffff;
+    --red: #ff3333;
+    --white: #cccccc;
+    --border: #00ff4155;
+    --scanline: rgba(0,0,0,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--green);
+    font-family: 'Inconsolata', 'Courier New', monospace;
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* CRT scanline effect */
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      var(--scanline) 0px,
+      var(--scanline) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* CRT vignette */
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 9998;
+  }
+
+  .screen {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 10px;
+    animation: flicker 8s infinite;
+  }
+
+  @keyframes flicker {
+    0%, 97%, 100% { opacity: 1; }
+    98% { opacity: 0.85; }
+    99% { opacity: 1; }
+    99.5% { opacity: 0.9; }
+  }
+
+  /* ══ HEADER ══ */
+  .header {
+    border: 1px solid var(--green);
+    padding: 10px;
+    text-align: center;
+    margin-bottom: 4px;
+    background: var(--green-dark);
+    box-shadow: 0 0 20px #00ff4133, inset 0 0 20px #00ff4108;
+    position: relative;
+  }
+
+  .header-logo {
+    font-family: 'Courier Prime', 'Courier New', monospace;
+    font-size: 52px;
+    color: var(--green);
+    text-shadow: 0 0 10px var(--green), 0 0 20px var(--green), 0 0 40px #00ff4188;
+    letter-spacing: 6px;
+    line-height: 1;
+  }
+
+  .header-sub {
+    font-size: 11px;
+    color: var(--amber);
+    letter-spacing: 3px;
+    text-shadow: 0 0 6px var(--amber);
+    margin-top: 4px;
+  }
+
+  .header-info {
+    font-size: 11px;
+    color: var(--green-dim);
+    margin-top: 6px;
+  }
+
+  .blink {
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ══ STATUS BAR ══ */
+  .statusbar {
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid var(--green);
+    border-top: none;
+    padding: 3px 8px;
+    background: #001500;
+    font-size: 11px;
+    color: var(--green-dim);
+    margin-bottom: 6px;
+  }
+
+  .statusbar span { color: var(--cyan); }
+
+  /* ══ LAYOUT ══ */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 4px;
+  }
+
+  /* ══ SIDEBAR ══ */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .panel {
+    border: 1px solid var(--green);
+    background: var(--bg2);
+  }
+
+  .panel-title {
+    background: var(--green-dark);
+    border-bottom: 1px solid var(--green);
+    padding: 3px 8px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--amber);
+    text-shadow: 0 0 6px var(--amber);
+  }
+
+  .panel-body {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* Menu */
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 2px;
+    cursor: pointer;
+    color: var(--green-dim);
+    transition: color 0.1s;
+    border-bottom: 1px dotted #00ff4122;
+  }
+
+  .menu-item:last-child { border-bottom: none; }
+
+  .menu-item:hover, .menu-item.active {
+    color: var(--green);
+    background: #00ff4110;
+    text-shadow: 0 0 6px var(--green);
+  }
+
+  .menu-key {
+    color: var(--cyan);
+    font-size: 11px;
+    min-width: 18px;
+  }
+
+  /* Online users */
+  .user-entry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 11px;
+    color: var(--green-dim);
+  }
+
+  .user-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 4px var(--green);
+    display: inline-block;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .user-dot.away { background: var(--amber); box-shadow: 0 0 4px var(--amber); }
+  .user-dot.busy { background: var(--red); box-shadow: 0 0 4px var(--red); }
+
+  /* Stats */
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 2px 0;
+    font-size: 11px;
+    border-bottom: 1px dotted #00ff4115;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-val { color: var(--cyan); }
+
+  /* ══ MAIN CONTENT ══ */
+  .content { display: flex; flex-direction: column; gap: 4px; }
+
+  /* Board list */
+  .board-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .board-table thead tr {
+    background: var(--green-dark);
+    border-bottom: 1px solid var(--green);
+  }
+
+  .board-table th {
+    padding: 4px 8px;
+    text-align: left;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--amber);
+    font-weight: normal;
+  }
+
+  .board-table td {
+    padding: 4px 8px;
+    border-bottom: 1px dotted #00ff4122;
+    color: var(--green-dim);
+    vertical-align: top;
+  }
+
+  .board-table tr:hover td {
+    background: #00ff4108;
+    color: var(--green);
+    cursor: pointer;
+  }
+
+  .board-name {
+    color: var(--cyan);
+    font-size: 13px;
+  }
+
+  .board-desc { font-size: 11px; }
+
+  .badge {
+    display: inline-block;
+    padding: 0 5px;
+    font-size: 10px;
+    border: 1px solid;
+  }
+
+  .badge-new { border-color: var(--green); color: var(--green); }
+  .badge-hot { border-color: var(--red); color: var(--red); }
+  .badge-locked { border-color: var(--amber); color: var(--amber); }
+
+  /* Message thread */
+  .thread {
+    border: 1px solid var(--border);
+    margin-bottom: 0;
+  }
+
+  .thread-header {
+    background: #001a00;
+    border-bottom: 1px solid var(--border);
+    padding: 5px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .thread-title {
+    color: var(--cyan);
+    font-size: 13px;
+  }
+
+  .thread-meta {
+    font-size: 10px;
+    color: var(--green-dim);
+  }
+
+  .message {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    border-bottom: 1px dotted #00ff4122;
+  }
+
+  .message:last-child { border-bottom: none; }
+
+  .msg-author {
+    border-right: 1px dotted #00ff4133;
+    padding: 8px;
+    font-size: 11px;
+    background: #050f05;
+  }
+
+  .msg-handle {
+    color: var(--amber);
+    font-size: 12px;
+    text-shadow: 0 0 4px var(--amber);
+  }
+
+  .msg-info { color: #007700; font-size: 10px; margin-top: 2px; }
+
+  .msg-level {
+    color: var(--cyan);
+    font-size: 10px;
+    margin-top: 4px;
+    border: 1px solid #00ffff44;
+    padding: 1px 4px;
+    display: inline-block;
+  }
+
+  .msg-body {
+    padding: 8px 10px;
+    color: var(--white);
+    line-height: 1.6;
+    font-size: 12px;
+  }
+
+  .msg-body .quote {
+    border-left: 2px solid var(--green-dim);
+    padding-left: 8px;
+    color: var(--green-dim);
+    font-style: normal;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+
+  .msg-date {
+    font-size: 10px;
+    color: #006600;
+    margin-top: 6px;
+    border-top: 1px dotted #00ff4122;
+    padding-top: 4px;
+  }
+
+  /* Input area */
+  .input-area {
+    border: 1px solid var(--green);
+    background: var(--bg2);
+  }
+
+  .input-title {
+    background: var(--green-dark);
+    border-bottom: 1px solid var(--green);
+    padding: 3px 8px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: var(--amber);
+    text-shadow: 0 0 6px var(--amber);
+  }
+
+  .input-body { padding: 8px; }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 8px;
+  }
+
+  .input-label {
+    font-size: 11px;
+    color: var(--green-dim);
+    min-width: 70px;
+  }
+
+  .input-field {
+    flex: 1;
+    background: #001a00;
+    border: 1px solid #00ff4144;
+    color: var(--green);
+    font-family: 'Inconsolata', 'Courier New', monospace;
+    font-size: 12px;
+    padding: 3px 6px;
+    outline: none;
+    caret-color: var(--green);
+  }
+
+  .input-field:focus {
+    border-color: var(--green);
+    box-shadow: 0 0 6px #00ff4133;
+  }
+
+  textarea.input-field {
+    resize: vertical;
+    min-height: 60px;
+    line-height: 1.5;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .btn {
+    background: #001a00;
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-family: 'Inconsolata', 'Courier New', monospace;
+    font-size: 12px;
+    padding: 4px 14px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: all 0.1s;
+  }
+
+  .btn:hover {
+    background: var(--green-dark);
+    box-shadow: 0 0 8px var(--green);
+    text-shadow: 0 0 4px var(--green);
+  }
+
+  .btn-cancel {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  .btn-cancel:hover {
+    background: #1a0000;
+    box-shadow: 0 0 8px var(--red);
+  }
+
+  /* Ticker */
+  .ticker {
+    border: 1px solid var(--green);
+    border-top: none;
+    background: #001a00;
+    padding: 3px 8px;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--amber);
+    margin-top: 4px;
+  }
+
+  .ticker-inner {
+    display: inline-block;
+    animation: ticker 30s linear infinite;
+  }
+
+  @keyframes ticker {
+    0% { transform: translateX(100vw); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* Bottom bar */
+  .bottombar {
+    display: flex;
+    justify-content: space-between;
+    border: 1px solid var(--green);
+    border-top: none;
+    padding: 3px 8px;
+    background: #001500;
+    font-size: 11px;
+    color: var(--green-dim);
+  }
+
+  /* Divider */
+  .divider {
+    border: none;
+    border-top: 1px solid #00ff4133;
+    margin: 2px 0;
+  }
+
+  /* Notification */
+  .notify {
+    border: 1px solid var(--amber);
+    background: #1a0f00;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ASCII art corners */
+  .corner-tl::before { content: '╔'; }
+  .corner-tr::before { content: '╗'; }
+
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo">█▓ DARKNET BBS ▓█</div>
+    <div class="header-sub">◄ ELEKTRONSKI OGLASNI SISTEM v2.3 ►</div>
+    <div class="header-info">
+      Dobrodošli u DARKNET BBS! &nbsp;|&nbsp; Sysop: <span style="color:var(--cyan)">ZG_Phantom</span>
+      &nbsp;|&nbsp; Veza: <span style="color:var(--green)">2400 BAUD</span>
+      &nbsp;|&nbsp; <span class="blink">█</span> ONLINE
+    </div>
+  </div>
+
+  <!-- STATUSBAR -->
+  <div class="statusbar">
+    <div>KORISNIK: <span>GOST</span> &nbsp;|&nbsp; NIVO: <span>0</span> &nbsp;|&nbsp; PORUKE: <span>0/50</span></div>
+    <div>DATUM: <span id="dateNow"></span> &nbsp;|&nbsp; VREME: <span id="timeNow"></span></div>
+    <div>SESIJA: <span>00:04:32</span> &nbsp;|&nbsp; PING: <span>42ms</span></div>
+  </div>
+
+  <!-- NOTIFICATION -->
+  <div class="notify" style="margin-bottom:4px;">
+    ⚠ SISTEM: Dobrodošli na DARKNET BBS. Registrujte se za pristup svim temama. Pravila: nema uvrede, nema SPAM-a.
+  </div>
+
+  <!-- MAIN LAYOUT -->
+  <div class="main-layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+
+      <!-- NAVIGACIJA -->
+      <div class="panel">
+        <div class="panel-title">[ NAVIGACIJA ]</div>
+        <div class="panel-body">
+          <div class="menu-item active">
+            <span class="menu-key">[M]</span> Oglasne table
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[F]</span> Fajl arhiva
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[C]</span> Chat soba
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[D]</span> Dnevnik veza
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[U]</span> Korisnici
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[S]</span> Podešavanja
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[H]</span> Pomoć
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[G]</span> Igre
+          </div>
+          <div class="menu-item">
+            <span class="menu-key">[Q]</span> Odjava
+          </div>
+        </div>
+      </div>
+
+      <!-- ONLINE KORISNICI -->
+      <div class="panel">
+        <div class="panel-title">[ ONLINE (7) ]</div>
+        <div class="panel-body">
+          <div class="user-entry"><span class="user-dot"></span> ZG_Phantom</div>
+          <div class="user-entry"><span class="user-dot"></span> h4ck3r_ns</div>
+          <div class="user-entry"><span class="user-dot away"></span> RetroMajstor</div>
+          <div class="user-entry"><span class="user-dot"></span> PixelBrat</div>
+          <div class="user-entry"><span class="user-dot busy"></span> SysAdmin1</div>
+          <div class="user-entry"><span class="user-dot"></span> Anonymous99</div>
+          <div class="user-entry"><span class="user-dot away"></span> MegaUpload_SR</div>
+          <hr class="divider">
+          <div style="font-size:10px; color:#006600; margin-top:4px;">
+            ● Online &nbsp; ◐ Odsutan &nbsp; ● Zauzet
+          </div>
+        </div>
+      </div>
+
+      <!-- STATISTIKA -->
+      <div class="panel">
+        <div class="panel-title">[ STATISTIKA ]</div>
+        <div class="panel-body">
+          <div class="stat-row">Korisnici: <span class="stat-val">1,247</span></div>
+          <div class="stat-row">Poruke: <span class="stat-val">48,392</span></div>
+          <div class="stat-row">Fajlovi: <span class="stat-val">3,841</span></div>
+          <div class="stat-row">Table: <span class="stat-val">24</span></div>
+          <div class="stat-row">Rekord: <span class="stat-val">63</span></div>
+          <div class="stat-row">Od: <span class="stat-val">1994-03-12</span></div>
+        </div>
+      </div>
+
+      <!-- VESTI -->
+      <div class="panel">
+        <div class="panel-title">[ SYSOP VESTI ]</div>
+        <div class="panel-body" style="font-size:11px; color:var(--green-dim); line-height:1.6;">
+          06.06: Novi fajlovi u WAREZ sekciji!<br>
+          05.06: Chat soba ažurirana<br>
+          01.06: Backup sistema završen<br>
+          28.05: Novi Sysop asistent: <span style="color:var(--cyan)">RetroMajstor</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content">
+
+      <!-- BOARD LIST -->
+      <div class="panel">
+        <div class="panel-title">[ OGLASNE TABLE — Odaberite temu ]</div>
+        <div class="panel-body" style="padding:0;">
+          <table class="board-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>NAZIV TABLE</th>
+                <th>OPIS</th>
+                <th>PORUKE</th>
+                <th>NOVO</th>
+                <th>ZADNJA</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>1</td>
+                <td class="board-name">► OPŠTE</td>
+                <td class="board-desc">Razno i svašta</td>
+                <td>4,231</td>
+                <td><span class="badge badge-new">+12</span></td>
+                <td>danas</td>
+              </tr>
+              <tr>
+                <td>2</td>
+                <td class="board-name">► PROGRAMIRANJE</td>
+                <td class="board-desc">C, Pascal, Assembler, BASIC</td>
+                <td>8,492</td>
+                <td><span class="badge badge-hot">HOT</span></td>
+                <td>danas</td>
+              </tr>
+              <tr>
+                <td>3</td>
+                <td class="board-name">► HARDVER</td>
+                <td class="board-desc">PC komponente i popravke</td>
+                <td>3,107</td>
+                <td><span class="badge badge-new">+3</span></td>
+                <td>juče</td>
+              </tr>
+              <tr>
+                <td>4</td>
+                <td class="board-name">► WAREZ / FAJLOVI</td>
+                <td class="board-desc">Razmena programa i igara</td>
+                <td>12,844</td>
+                <td><span class="badge badge-hot">HOT</span></td>
+                <td>danas</td>
+              </tr>
+              <tr>
+                <td>5</td>
+                <td class="board-name">► HACKING / PHREAKING</td>
+                <td class="board-desc">Samo edukacija! (Nivo 5+)</td>
+                <td>2,918</td>
+                <td></td>
+                <td>juče</td>
+              </tr>
+              <tr>
+                <td>6</td>
+                <td class="board-name">► IGRE</td>
+                <td class="board-desc">DOS igre, recenzije, saveti</td>
+                <td>5,331</td>
+                <td><span class="badge badge-new">+7</span></td>
+                <td>danas</td>
+              </tr>
+              <tr>
+                <td>7</td>
+                <td class="board-name">► MUZIKA</td>
+                <td class="board-desc">MOD fajlovi, scene, demo</td>
+                <td>1,892</td>
+                <td></td>
+                <td>3 dana</td>
+              </tr>
+              <tr>
+                <td>8</td>
+                <td class="board-name">► [ZAKLJUČANO]</td>
+                <td class="board-desc">Arhiva starih tema</td>
+                <td>9,104</td>
+                <td><span class="badge badge-locked">LCK</span></td>
+                <td>—</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- THREAD PREVIEW -->
+      <div class="panel">
+        <div class="panel-title">[ AKTIVNA TEMA — PROGRAMIRANJE ]</div>
+        <div class="panel-body" style="padding:0;">
+
+          <div class="thread">
+            <div class="thread-header">
+              <div class="thread-title">► [Q] Kako koristiti pointer-e u C-u bez da program crashuje?</div>
+              <div class="thread-meta">Poruka: 3 &nbsp;|&nbsp; Čita: 47</div>
+            </div>
+
+            <!-- MSG 1 -->
+            <div class="message">
+              <div class="msg-author">
+                <div class="msg-handle">PixelBrat</div>
+                <div class="msg-info">Registrovan: 1995<br>Poruka: 312</div>
+                <div class="msg-level">Nivo III</div>
+              </div>
+              <div class="msg-body">
+                Zdravo svima,<br><br>
+                imam problem sa pointer-ima u C-u. Svaki put kad probam da pristupim memoriji program se zamrzne ili izbaci grešku. Koristim Turbo C 2.0 na DOS-u.<br><br>
+                Evo mog koda:<br>
+                <br>
+                &nbsp;&nbsp;int *ptr;<br>
+                &nbsp;&nbsp;*ptr = 42; &nbsp;&nbsp;&lt;-- ovde pada<br>
+                <br>
+                Šta radim pogrešno? Hvala unapred!
+                <div class="msg-date">06.06.1996 — 14:23:11</div>
+              </div>
+            </div>
+
+            <!-- MSG 2 -->
+            <div class="message">
+              <div class="msg-author">
+                <div class="msg-handle">h4ck3r_ns</div>
+                <div class="msg-info">Registrovan: 1993<br>Poruka: 4,821</div>
+                <div class="msg-level">Nivo VII</div>
+              </div>
+              <div class="msg-body">
+                <div class="quote">
+                  &gt; PixelBrat pisao:<br>
+                  &gt; int *ptr;<br>
+                  &gt; *ptr = 42; &lt;-- ovde pada
+                </div>
+                Klasična greška! Deklarisao si pointer ali nisi mu dodelio adresu. Pointer pokazuje na random memoriju i crashuješ sistem.<br><br>
+                Treba ovako:<br>
+                <br>
+                &nbsp;&nbsp;int vrednost;<br>
+                &nbsp;&nbsp;int *ptr = &vrednost; &nbsp;/* & daje adresu */<br>
+                &nbsp;&nbsp;*ptr = 42; &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/* sada radi! */<br>
+                <br>
+                Ili koristiti malloc() za dinamičku memoriju. Čitaj Kernighan & Ritchie, strana 94.
+                <div class="msg-date">06.06.1996 — 15:01:44</div>
+              </div>
+            </div>
+
+            <!-- MSG 3 -->
+            <div class="message">
+              <div class="msg-author">
+                <div class="msg-handle">ZG_Phantom</div>
+                <div class="msg-info">Registrovan: 1992<br>Poruka: 11,203</div>
+                <div class="msg-level" style="border-color:var(--amber);color:var(--amber);">SysOp</div>
+              </div>
+              <div class="msg-body">
+                <div class="quote">
+                  &gt; h4ck3r_ns pisao dobar odgovor
+                </div>
+                Tačno! Dodao bih još — uvek proveri da li malloc() vratio NULL pre korišćenja:<br>
+                <br>
+                &nbsp;&nbsp;int *ptr = malloc(sizeof(int));<br>
+                &nbsp;&nbsp;if (ptr == NULL) { printf("Nema mem!\n"); return; }<br>
+                &nbsp;&nbsp;*ptr = 42;<br>
+                &nbsp;&nbsp;free(ptr); &nbsp;/* UVEK oslobodi! */<br>
+                <br>
+                Memory leak je GORI od crash-a na produkciji. Svakako, pogledaj sekciju FAJLOVI — postavio sam K&R knjigu u PDF formatu za preuzimanje.
+                <div class="msg-date">06.06.1996 — 15:47:29</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- REPLY FORM -->
+      <div class="input-area">
+        <div class="input-title">[ ODGOVORI NA TEMU ]</div>
+        <div class="input-body">
+          <div class="input-row">
+            <span class="input-label">Handle:</span>
+            <input class="input-field" type="text" value="GOST" readonly style="max-width:160px; color:#006600;">
+            <span style="font-size:10px; color:#006600; margin-left:8px;">* Prijavite se da biste pisali</span>
+          </div>
+          <div class="input-row">
+            <span class="input-label">Tema:</span>
+            <input class="input-field" type="text" placeholder="Re: Kako koristiti pointer-e u C-u...">
+          </div>
+          <div class="input-row" style="align-items:flex-start;">
+            <span class="input-label" style="margin-top:4px;">Poruka:</span>
+            <textarea class="input-field" placeholder="Unesite svoju poruku ovde...&#10;&#10;Tagovi: [b]bold[/b]  [i]italic[/i]  [code]kod[/code]  [quote]citat[/quote]"></textarea>
+          </div>
+          <div class="btn-row">
+            <button class="btn" onclick="handlePost()">[F2] POŠALJI</button>
+            <button class="btn" style="border-color:var(--cyan);color:var(--cyan);">[F3] PREGLED</button>
+            <button class="btn btn-cancel">[ESC] ODUSTANI</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TICKER -->
+  <div class="ticker">
+    <span class="ticker-inner">
+      *** NOVO U WAREZ SEKCIJI: Doom II v1.9, Windows 95 WAREZ, PKZIP 2.04g *** 
+      CHAT SOBA OTVORENA — pridruži se! *** 
+      Novi korisnik se registrovao: modem_lover_bg *** 
+      Rekord dana: h4ck3r_ns sa 47 poruka *** 
+      SYSOP: Backup sistema u subotu u 03:00 — kratki zastoj *** 
+      Fajl sekcija: novi ANSI art paketi dostupni za preuzimanje *** 
+      &gt;&gt;&gt; DARKNET BBS — Vaša digitalna zajednica od 1992. godine &lt;&lt;&lt;
+    </span>
+  </div>
+
+  <!-- BOTTOM BAR -->
+  <div class="bottombar">
+    <div>
+      [M]eni &nbsp; [F]ajlovi &nbsp; [C]hat &nbsp; [R]eply &nbsp; [N]ovo &nbsp; [?]Pomoć
+    </div>
+    <div>
+      MODEM: COM2 2400/N/8/1 &nbsp;|&nbsp; EMULACIJA: ANSI &nbsp;|&nbsp; <span class="blink">▌</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Clock
+  function updateTime() {
+    const now = new Date();
+    const d = now.toLocaleDateString('sr-RS', {day:'2-digit',month:'2-digit',year:'numeric'});
+    const t = now.toLocaleTimeString('sr-RS');
+    document.getElementById('dateNow').textContent = d;
+    document.getElementById('timeNow').textContent = t;
+  }
+  updateTime();
+  setInterval(updateTime, 1000);
+
+  // Post handler
+  function handlePost() {
+    alert('GREŠKA: Morate biti prijavljeni da biste slali poruke!\n\n[R] Registracija  [L] Prijava');
+  }
+
+  // Menu items
+  document.querySelectorAll('.menu-item').forEach(item => {
+    item.addEventListener('click', function() {
+      document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
+      this.classList.add('active');
+    });
+  });
+
+  // Session timer
+  let seconds = 272;
+  setInterval(() => {
+    seconds++;
+    const h = String(Math.floor(seconds/3600)).padStart(2,'0');
+    const m = String(Math.floor((seconds%3600)/60)).padStart(2,'0');
+    const s = String(seconds%60).padStart(2,'0');
+    document.querySelector('.statusbar span:nth-child(3)') &&
+      null; // just let it count
+  }, 1000);
+</script>
+</body>
+</html>
